@@ -1,6 +1,7 @@
 import { isImmutable } from '../predicates/isImmutable';
 import hasOwnProperty from '../utils/hasOwnProperty';
 import isDataStructure from '../utils/isDataStructure';
+import setProp from '../utils/setProp';
 import shallowCopy from '../utils/shallowCopy';
 
 export function set(collection, key, value) {
@@ -21,6 +22,6 @@ export function set(collection, key, value) {
     return collection;
   }
   const collectionCopy = shallowCopy(collection);
-  collectionCopy[key] = value;
+  setProp(collectionCopy, key, value);
   return collectionCopy;
 }

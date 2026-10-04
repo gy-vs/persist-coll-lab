@@ -3,10 +3,13 @@ import {
   List,
   Map,
   MapOf,
+  remove,
   removeIn,
   Seq,
   Set,
+  set,
   setIn,
+  update,
   updateIn,
 } from 'immutable';
 
@@ -400,6 +403,98 @@ describe('updateIn', () => {
       expect(m.mergeDeepIn(['a'], { x: [4, 5, 6] })).toEqual(
         Map({ a: { x: [1, 2, 3, 4, 5, 6] } })
       );
+    });
+  });
+
+  describe('__proto__ key safety on raw JS objects', () => {
+    function protoValueOf(object: object) {
+      return Object.getOwnPropertyDescriptor(object, '__proto__')?.value;
+    }
+
+    function expectProtoSafe(object: { [key: string]: unknown }) {
+      expect(Object.getPrototypeOf(object)).toBe(Object.prototype);
+      expect(object.isAdmin).toBe(undefined);
+      expect(Object.prototype.hasOwnProperty.call(object, '__proto__')).toBe(
+        true
+      );
+      expect(protoValueOf(object)).toEqual({ isAdmin: true });
+      expect(Object.keys(object)).toContain('__proto__');
+    }
+
+    it('set treats __proto__ as a plain own property', () => {
+      expectProtoSafe(
+        set(
+          JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}'),
+          'title',
+          'x'
+        )
+      );
+      expectProtoSafe(set({}, '__proto__', { isAdmin: true }));
+    });
+
+    it('set returns the same object when the value did not change', () => {
+      const body = JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}');
+      expect(set(body, 'title', 't')).toBe(body);
+      expect(set(body, '__proto__', protoValueOf(body))).toBe(body);
+    });
+
+    it('setIn treats __proto__ as a plain own property', () => {
+      const result = setIn({}, ['__proto__', 'isAdmin'], true) as {
+        isAdmin?: boolean;
+      };
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+      expect(result.isAdmin).toBe(undefined);
+      expect(protoValueOf(result)).toEqual({ isAdmin: true });
+    });
+
+    it('setIn returns the same object when the value did not change', () => {
+      const body = JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}');
+      expect(setIn(body, ['title'], 't')).toBe(body);
+    });
+
+    it('update/updateIn treat __proto__ as a plain own property', () => {
+      const body = JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}');
+      const updated = update(body, 'title', (title: unknown) => title + '!');
+      expectProtoSafe(updated);
+      expect(updated.title).toBe('t!');
+
+      const deepUpdated = updateIn(
+        body,
+        ['__proto__', 'isAdmin'],
+        value => !value
+      );
+      expect(Object.getPrototypeOf(deepUpdated)).toBe(Object.prototype);
+      expect(deepUpdated.isAdmin).toBe(undefined);
+      expect(protoValueOf(deepUpdated)).toEqual({ isAdmin: false });
+    });
+
+    it('update returns the same object when the value did not change', () => {
+      const body = JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}');
+      expect(update(body, 'title', (value: unknown) => value)).toBe(body);
+    });
+
+    it('remove keeps __proto__ as a plain own property', () => {
+      const result = remove(
+        JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}'),
+        'title'
+      );
+      expectProtoSafe(result);
+      expect(Object.keys(result)).toEqual(['__proto__']);
+    });
+
+    it('removeIn treats __proto__ as a plain own property', () => {
+      const result = removeIn(
+        JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}'),
+        ['__proto__', 'isAdmin']
+      );
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+      expect(result.isAdmin).toBe(undefined);
+      expect(protoValueOf(result)).toEqual({});
+    });
+
+    it('does not pollute Object.prototype', () => {
+      setIn({}, ['__proto__', 'isAdmin'], true);
+      expect(({} as { isAdmin?: boolean }).isAdmin).toBe(undefined);
     });
   });
 });

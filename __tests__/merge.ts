@@ -328,4 +328,68 @@ describe('merge', () => {
     const b = Map({ a: Map([[0, Map({ y: 2 })]]) });
     expect(mergeDeep(a, b)).toEqual({ a: Map([[0, Map({ y: 2 })]]) });
   });
+
+  it('functional merge treats the __proto__ key as a plain own property', () => {
+    const body = JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}');
+    const result = merge({}, body) as { isAdmin?: boolean };
+    const protoValue = Object.getOwnPropertyDescriptor(
+      result,
+      '__proto__'
+    )?.value;
+
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(result.isAdmin).toBeUndefined();
+    expect(Object.keys(result).sort()).toEqual(['__proto__', 'title']);
+    expect(protoValue).toEqual({ isAdmin: true });
+  });
+
+  it('functional mergeDeep treats the __proto__ key as a plain own property', () => {
+    const result = mergeDeep(
+      { a: 1 },
+      JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}')
+    ) as { a: number; isAdmin?: boolean };
+    const protoValue = Object.getOwnPropertyDescriptor(
+      result,
+      '__proto__'
+    )?.value;
+
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(result.isAdmin).toBeUndefined();
+    expect(Object.keys(result).sort()).toEqual(
+      ['__proto__', 'a', 'title'].sort()
+    );
+    expect(protoValue).toEqual({ isAdmin: true });
+  });
+
+  it('functional mergeDeep merges within a __proto__ value safely', () => {
+    const result = mergeDeep(
+      {},
+      JSON.parse('{"__proto__":{"a":1}}'),
+      JSON.parse('{"__proto__":{"b":2}}')
+    );
+    const protoValue = Object.getOwnPropertyDescriptor(
+      result,
+      '__proto__'
+    )?.value;
+
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect((result as { isAdmin?: boolean }).isAdmin).toBeUndefined();
+    expect(protoValue).toEqual({ a: 1, b: 2 });
+  });
+
+  it('functional merge does not copy inherited properties and keeps Object.prototype', () => {
+    const poisoned = Object.assign(Object.create({ isAdmin: true }), {
+      a: 1,
+    });
+    const result = merge({}, poisoned) as { a: number; isAdmin?: boolean };
+
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(result.isAdmin).toBeUndefined();
+    expect(Object.keys(result)).toEqual(['a']);
+  });
+
+  it('functional merge returns the same object when nothing changes', () => {
+    const body = JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}');
+    expect(merge(body, {})).toBe(body);
+  });
 });

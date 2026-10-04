@@ -207,4 +207,60 @@ describe('Conversion', () => {
     const result = fromJS(arr).entrySeq().toJS();
     expect(result).toEqual([[0, { key: 'a' }]]);
   });
+
+  it('treats the __proto__ key as a plain own property when converting to JS', () => {
+    const parsed = JSON.parse(
+      '{"title":"t","__proto__":{"isAdmin":true},"nested":{"__proto__":{"x":1}}}'
+    );
+    const result = fromJS(parsed).toJS();
+    const protoValue = Object.getOwnPropertyDescriptor(
+      result,
+      '__proto__'
+    )?.value;
+    const nestedProtoValue = Object.getOwnPropertyDescriptor(
+      result.nested,
+      '__proto__'
+    )?.value;
+
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(result.isAdmin).toBeUndefined();
+    expect(Object.keys(result).sort()).toEqual(
+      ['__proto__', 'nested', 'title'].sort()
+    );
+    expect(protoValue).toEqual({ isAdmin: true });
+    expect(Object.getPrototypeOf(result.nested)).toBe(Object.prototype);
+    expect(nestedProtoValue).toEqual({ x: 1 });
+    // Round-trips back to the same Map.
+    expect(is(fromJS(result), fromJS(parsed))).toBe(true);
+    // Does not affect Object.prototype itself.
+    expect(({} as { isAdmin?: boolean }).isAdmin).toBeUndefined();
+  });
+
+  it('treats the __proto__ key as a plain own property in arrays when converting to JS', () => {
+    const parsed = JSON.parse('[{"__proto__":{"isAdmin":true}}]');
+    const result = fromJS(parsed).toJS();
+    const protoValue = Object.getOwnPropertyDescriptor(
+      result[0],
+      '__proto__'
+    )?.value;
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(Object.getPrototypeOf(result[0])).toBe(Object.prototype);
+    expect(result[0].isAdmin).toBeUndefined();
+    expect(protoValue).toEqual({ isAdmin: true });
+  });
+
+  it('treats the __proto__ key as a plain own property with toObject()/toJSON()', () => {
+    const map = Map(JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}'));
+    [map.toObject(), map.toJSON()].forEach(result => {
+      const protoValue = Object.getOwnPropertyDescriptor(
+        result,
+        '__proto__'
+      )?.value;
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+      expect(result.isAdmin).toBeUndefined();
+      expect(Object.keys(result).sort()).toEqual(['__proto__', 'title']);
+      expect(protoValue).toEqual({ isAdmin: true });
+    });
+  });
 });
