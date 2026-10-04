@@ -2,6 +2,7 @@ import { Seq } from './Seq';
 import { isCollection } from './predicates/isCollection';
 import { isKeyed } from './predicates/isKeyed';
 import isDataStructure from './utils/isDataStructure';
+import setInObject from './utils/setInObject';
 
 export function toJS(value) {
   if (!value || typeof value !== 'object') {
@@ -16,7 +17,7 @@ export function toJS(value) {
   if (isKeyed(value)) {
     const result = {};
     value.__iterate((v, k) => {
-      result[k] = toJS(v);
+      setInObject(result, k, toJS(v));
     });
     return result;
   }

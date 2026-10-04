@@ -199,6 +199,60 @@ describe('merge', () => {
     });
   });
 
+  it('merges a __proto__ key as data without prototype pollution', () => {
+    const parsed = JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}');
+    const merged = merge({ a: 1 }, parsed) as {
+      a: number;
+      isAdmin?: boolean;
+    };
+
+    expect(Object.getPrototypeOf(merged)).toBe(Object.prototype);
+    expect(merged.a).toBe(1);
+    expect(merged.isAdmin).toBe(undefined);
+    expect(Object.keys(merged).sort()).toEqual(['__proto__', 'a', 'title']);
+    expect(Object.getOwnPropertyDescriptor(merged, '__proto__')).toMatchObject({
+      value: { isAdmin: true },
+    });
+  });
+
+  it('mergeDeep writes a __proto__ key as data without pollution', () => {
+    const parsed = JSON.parse('{"__proto__":{"isAdmin":true}}');
+    const merged = mergeDeep({ a: 1 }, parsed) as {
+      a: number;
+      isAdmin?: boolean;
+    };
+
+    expect(Object.getPrototypeOf(merged)).toBe(Object.prototype);
+    expect(merged.a).toBe(1);
+    expect(merged.isAdmin).toBe(undefined);
+    expect(Object.keys(merged).sort()).toEqual(['__proto__', 'a']);
+    expect(Object.getOwnPropertyDescriptor(merged, '__proto__')).toMatchObject({
+      value: { isAdmin: true },
+    });
+  });
+
+  it('does not pollute Object.prototype while merging', () => {
+    const parsed = JSON.parse('{"__proto__":{"isAdmin":true}}');
+    merge({}, parsed);
+    mergeDeep({}, parsed);
+    expect(Object.getOwnPropertyDescriptor(Object.prototype, 'isAdmin')).toBe(
+      undefined
+    );
+    expect(({} as { isAdmin?: boolean }).isAdmin).toBe(undefined);
+  });
+
+  it('handles __proto__ when merging into a null-prototype object', () => {
+    const target = Object.create(null) as { [key: string]: unknown };
+    target.x = 1;
+    const merged = merge(target, JSON.parse('{"__proto__":{"isAdmin":true}}'));
+
+    expect(Object.getPrototypeOf(merged)).toBe(Object.prototype);
+    expect((merged as { isAdmin?: boolean }).isAdmin).toBe(undefined);
+    expect(Object.getOwnPropertyDescriptor(target, '__proto__')).toBe(
+      undefined
+    );
+  });
+
   it('merges plain Arrays', () => {
     expect(merge([1, 2], [3, 4], List([5, 6]))).toEqual([1, 2, 3, 4, 5, 6]);
   });

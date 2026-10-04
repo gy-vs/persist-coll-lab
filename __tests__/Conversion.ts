@@ -207,4 +207,62 @@ describe('Conversion', () => {
     const result = fromJS(arr).entrySeq().toJS();
     expect(result).toEqual([[0, { key: 'a' }]]);
   });
+
+  it('does not alter the prototype of objects converted with toJS()', () => {
+    const parsed = JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}');
+    const result = fromJS(parsed).toJS();
+
+    // `__proto__` is kept as a regular own data key, like `JSON.parse` does.
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(Object.keys(result).sort()).toEqual(['__proto__', 'title']);
+    expect(Object.getOwnPropertyDescriptor(result, '__proto__')).toMatchObject({
+      enumerable: true,
+      value: { isAdmin: true },
+    });
+    // The value from the malicious payload is not inherited.
+    expect((result as { isAdmin?: boolean }).isAdmin).toBe(undefined);
+  });
+
+  it('does not alter the prototype of objects converted with toObject()', () => {
+    const result = Map().set('__proto__', { isAdmin: true }).toObject();
+
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(Object.keys(result)).toEqual(['__proto__']);
+    expect(Object.getOwnPropertyDescriptor(result, '__proto__')).toMatchObject({
+      value: { isAdmin: true },
+    });
+    expect((result as { isAdmin?: boolean }).isAdmin).toBe(undefined);
+  });
+
+  it('handles __proto__ safely through a nested toJS() conversion', () => {
+    const parsed = JSON.parse(
+      '{"list":[{"a":1,"__proto__":{"isAdmin":true}}]}'
+    );
+    const result = fromJS(parsed).toJS() as {
+      list: Array<{ a: number; isAdmin?: boolean }>;
+    };
+
+    expect(Object.getPrototypeOf(result.list[0])).toBe(Object.prototype);
+    expect(Object.keys(result.list[0]).sort()).toEqual(['__proto__', 'a']);
+    expect(result.list[0].isAdmin).toBe(undefined);
+  });
+
+  it('round-trips __proto__ through fromJS() and toJS()', () => {
+    const parsed = JSON.parse('{"title":"t","__proto__":{"isAdmin":true}}');
+
+    expect(fromJS(parsed).has('__proto__')).toBe(true);
+    const result = fromJS(parsed).toJS();
+    expect(fromJS(result)).toEqual(fromJS(parsed));
+    expect(is(fromJS(result), fromJS(parsed))).toBe(true);
+  });
+
+  it('does not pollute Object.prototype during conversion', () => {
+    const parsed = JSON.parse('{"__proto__":{"isAdmin":true}}');
+    fromJS(parsed).toJS();
+    fromJS(parsed).toObject();
+    expect(Object.getOwnPropertyDescriptor(Object.prototype, 'isAdmin')).toBe(
+      undefined
+    );
+    expect(({} as { isAdmin?: boolean }).isAdmin).toBe(undefined);
+  });
 });

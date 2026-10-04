@@ -267,6 +267,30 @@ describe('updateIn', () => {
       const m = { a: { b: { c: 123 } } };
       expect(setIn(m, ['a', 'b', 'c'], 123)).toBe(m);
     });
+
+    it('sets a __proto__ key path in raw JS without prototype pollution', () => {
+      const m = setIn({}, ['__proto__', 'isAdmin'], true) as {
+        isAdmin?: boolean;
+      };
+
+      expect(Object.getPrototypeOf(m)).toBe(Object.prototype);
+      expect(m.isAdmin).toBe(undefined);
+      expect(Object.keys(m)).toEqual(['__proto__']);
+      expect(Object.getOwnPropertyDescriptor(m, '__proto__')).toMatchObject({
+        value: { isAdmin: true },
+      });
+    });
+
+    it('keeps __proto__ as data when editing inside it in raw JS', () => {
+      const parsed = JSON.parse('{"__proto__":{"isAdmin":false}}');
+      const m = setIn(parsed, ['__proto__', 'isAdmin'], true);
+
+      expect(Object.getPrototypeOf(m)).toBe(Object.prototype);
+      expect((m as { isAdmin?: boolean }).isAdmin).toBe(undefined);
+      expect(Object.getOwnPropertyDescriptor(m, '__proto__')).toMatchObject({
+        value: { isAdmin: true },
+      });
+    });
   });
 
   describe('removeIn', () => {

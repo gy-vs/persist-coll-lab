@@ -5,6 +5,7 @@ import { IndexedCollection, KeyedCollection } from '../Collection';
 import { Seq } from '../Seq';
 import hasOwnProperty from '../utils/hasOwnProperty';
 import isDataStructure from '../utils/isDataStructure';
+import setInObject from '../utils/setInObject';
 import shallowCopy from '../utils/shallowCopy';
 
 export function merge(collection, ...sources) {
@@ -60,7 +61,7 @@ export function mergeWithSources(collection, sources, merger) {
           if (merged === collection) {
             merged = shallowCopy(merged);
           }
-          merged[key] = nextVal;
+          setInObject(merged, key, nextVal);
         }
       };
   for (let i = 0; i < sources.length; i++) {
